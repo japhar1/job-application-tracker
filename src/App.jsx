@@ -1,52 +1,17 @@
-{/* Enhanced Filter & Search */}
-        <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Search</label>
-              <input
-                type="text"
-                placeholder="Company, position, notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Status Filter</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="All">All Status ({applications.length})</option>
-                {statusOptions.map(status => (
-                  <option key={status} value={status}>
-                    {status} ({applications.filter(a => a.status === status).length})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Platform Filter</label>
-              <select
-                value={filterPlatform}
-                onChange={(e) => setFilterPlatform(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="All">All Platforms</option>
-                {platformOptions.map(platform => (
-                  <option key={platform} value={platform}>{platform}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Sort By</label>
-              <div className="flex gap-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded px-3 py-2import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Download, Filter, Upload, TrendingUp, Calendar, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Download, Upload, TrendingUp, Calendar, Briefcase } from 'lucide-react';
+
+const statusColorMap = {
+  'Applied': 'bg-yellow-100 text-yellow-800',
+  'Screening': 'bg-purple-100 text-purple-800',
+  'Interview Scheduled': 'bg-indigo-100 text-indigo-800',
+  'Interviewed': 'bg-indigo-100 text-indigo-800',
+  'Technical Test': 'bg-cyan-100 text-cyan-800',
+  'Offer': 'bg-green-100 text-green-800',
+  'Rejected': 'bg-red-100 text-red-800',
+  'Withdrawn': 'bg-gray-100 text-gray-800',
+  'Follow-up Needed': 'bg-orange-100 text-orange-800',
+};
 
 const JobApplicationTracker = () => {
   const [applications, setApplications] = useState([]);
@@ -54,21 +19,66 @@ const JobApplicationTracker = () => {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
 
+  // Filter & Sort States
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterPlatform, setFilterPlatform] = useState('All');
+  const [sortBy, setSortBy] = useState('dateApplied');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const initialNewApp = {
+    company: '',
+    position: '',
+    location: '',
+    platform: 'LinkedIn',
+    dateApplied: new Date().toISOString().split('T')[0],
+    status: 'Applied',
+    salary: '',
+    jobUrl: '',
+    contactPerson: '',
+    notes: '',
+    cvVersion: 'Support',
+    followUpDate: '',
+    lastUpdate: new Date().toISOString().split('T')[0]
+  };
+  const [newApp, setNewApp] = useState(initialNewApp);
+
+  const statusOptions = ['Applied', 'Screening', 'Interview Scheduled', 'Interviewed', 'Technical Test', 'Offer', 'Rejected', 'Withdrawn', 'Follow-up Needed'];
+  const cvVersionOptions = ['Support', 'Infrastructure', 'Custom'];
+  const locationTypes = ['Remote', 'Hybrid', 'On-site - Lagos', 'On-site - Ibadan', 'On-site - Abuja', 'International Remote', 'Other'];
+  const platformOptions = ['LinkedIn', 'Upwork', 'Indeed', 'Company Website', 'Referral', 'Recruiter Contact', 'Other'];
+
+
+  // --- Persistence Logic ---
+
   // Load data from persistent storage on mount
   useEffect(() => {
     loadData();
   }, []);
 
-  // Auto-save whenever applications change
+  // Auto-save whenever applications change (DEBOUNCED)
   useEffect(() => {
-    if (applications.length > 0 && !loading) {
-      saveData();
+    if (!loading) {
+      // Use a debounce timer to avoid saving on every keystroke
+      const handler = setTimeout(() => {
+        if (applications.length > 0) {
+          saveData();
+        }
+      }, 500); // 500ms debounce time
+
+      // Cleanup function: will cancel the save if applications change before 500ms
+      return () => {
+        clearTimeout(handler);
+      };
     }
-  }, [applications]);
+  }, [applications]); // Only re-run if applications array changes
 
   const loadData = async () => {
     try {
-      const result = await window.storage.get('job-applications');
+      // window.storage is assumed to be available
+      const result = await window.storage.get('job-applications'); 
       if (result && result.value) {
         const data = JSON.parse(result.value);
         setApplications(data.applications || []);
@@ -88,7 +98,8 @@ const JobApplicationTracker = () => {
         applications,
         lastSync: new Date().toISOString()
       };
-      await window.storage.set('job-applications', JSON.stringify(data));
+      // window.storage is assumed to be available
+      await window.storage.set('job-applications', JSON.stringify(data)); 
       setLastSync(new Date());
     } catch (error) {
       console.error('Save failed:', error);
@@ -98,52 +109,12 @@ const JobApplicationTracker = () => {
     }
   };
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [filterPlatform, setFilterPlatform] = useState('All');
-  const [sortBy, setSortBy] = useState('dateApplied');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [newApp, setNewApp] = useState({
-    company: '',
-    position: '',
-    location: '',
-    platform: 'LinkedIn',
-    dateApplied: new Date().toISOString().split('T')[0],
-    status: 'Applied',
-    salary: '',
-    jobUrl: '',
-    contactPerson: '',
-    notes: '',
-    cvVersion: 'Support',
-    followUpDate: '',
-    lastUpdate: new Date().toISOString().split('T')[0]
-  });
-
-  const statusOptions = ['Applied', 'Screening', 'Interview Scheduled', 'Interviewed', 'Technical Test', 'Offer', 'Rejected', 'Withdrawn', 'Follow-up Needed'];
-  const cvVersionOptions = ['Support', 'Infrastructure', 'Custom'];
-  const locationTypes = ['Remote', 'Hybrid', 'On-site - Lagos', 'On-site - Ibadan', 'On-site - Abuja', 'International Remote', 'Other'];
-  const platformOptions = ['LinkedIn', 'Upwork', 'Indeed', 'Company Website', 'Referral', 'Recruiter Contact', 'Other'];
+  // --- CRUD Operations ---
 
   const addApplication = () => {
     if (newApp.company && newApp.position) {
       setApplications([...applications, { ...newApp, id: Date.now() }]);
-      setNewApp({
-        company: '',
-        position: '',
-        location: '',
-        platform: 'LinkedIn',
-        dateApplied: new Date().toISOString().split('T')[0],
-        status: 'Applied',
-        salary: '',
-        jobUrl: '',
-        contactPerson: '',
-        notes: '',
-        cvVersion: 'Support',
-        followUpDate: '',
-        lastUpdate: new Date().toISOString().split('T')[0]
-      });
+      setNewApp(initialNewApp);
       setIsAdding(false);
     }
   };
@@ -158,10 +129,8 @@ const JobApplicationTracker = () => {
     setEditingId(app.id);
   };
 
-  const saveEdit = (id) => {
-    setApplications(applications.map(app => 
-      app.id === id ? { ...app, lastUpdate: new Date().toISOString().split('T')[0] } : app
-    ));
+  // Simplified: Now only closes the edit state
+  const saveEdit = () => {
     setEditingId(null);
   };
 
@@ -169,11 +138,15 @@ const JobApplicationTracker = () => {
     setEditingId(null);
   };
 
+  // Improved: Automatically updates lastUpdate on any field change
   const updateField = (id, field, value) => {
+    const today = new Date().toISOString().split('T')[0];
     setApplications(applications.map(app => 
-      app.id === id ? { ...app, [field]: value } : app
+      app.id === id ? { ...app, [field]: value, lastUpdate: today } : app
     ));
   };
+
+  // --- Import/Export ---
 
   const exportToCSV = () => {
     const headers = ['Company', 'Position', 'Platform', 'Location', 'Date Applied', 'Status', 'Salary', 'Job URL', 'Contact Person', 'CV Version', 'Follow-up Date', 'Notes', 'Last Update'];
@@ -191,7 +164,7 @@ const JobApplicationTracker = () => {
         app.contactPerson,
         app.cvVersion,
         app.followUpDate,
-        `"${app.notes}"`,
+        `"${app.notes?.replace(/"/g, '""') || ''}"`, // Handle quotes in notes for better CSV compatibility
         app.lastUpdate
       ].join(','))
     ].join('\n');
@@ -210,23 +183,25 @@ const JobApplicationTracker = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target.result;
+        // Basic split, assumes no commas outside of quoted fields (use PapaParse for production)
         const rows = text.split('\n').slice(1); // Skip header
         const imported = rows.filter(row => row.trim()).map(row => {
-          const [company, position, platform, location, dateApplied, status, salary, jobUrl, contactPerson, cvVersion, followUpDate, notes] = row.split(',');
+          // This crude split relies heavily on the export order and format
+          const [company, position, platform, location, dateApplied, status, salary, jobUrl, contactPerson, cvVersion, followUpDate, notes] = row.split(',').map(s => s?.trim().replace(/"/g, ''));
           return {
             id: Date.now() + Math.random(),
-            company: company?.trim(),
-            position: position?.trim(),
-            platform: platform?.trim() || 'LinkedIn',
-            location: location?.trim(),
-            dateApplied: dateApplied?.trim(),
-            status: status?.trim(),
-            salary: salary?.trim(),
-            jobUrl: jobUrl?.trim(),
-            contactPerson: contactPerson?.trim(),
-            cvVersion: cvVersion?.trim(),
-            followUpDate: followUpDate?.trim(),
-            notes: notes?.replace(/"/g, '').trim(),
+            company: company,
+            position: position,
+            platform: platform || 'LinkedIn',
+            location: location,
+            dateApplied: dateApplied,
+            status: status,
+            salary: salary,
+            jobUrl: jobUrl,
+            contactPerson: contactPerson,
+            cvVersion: cvVersion,
+            followUpDate: followUpDate,
+            notes: notes,
             lastUpdate: new Date().toISOString().split('T')[0]
           };
         });
@@ -237,7 +212,8 @@ const JobApplicationTracker = () => {
     }
   };
 
-  // Filtering and sorting
+  // --- Filtering, Sorting, and Stats ---
+
   let filteredApplications = applications;
 
   // Apply status filter
@@ -247,6 +223,7 @@ const JobApplicationTracker = () => {
 
   // Apply platform filter
   if (filterPlatform !== 'All') {
+    // Ensure it correctly handles missing platform field
     filteredApplications = filteredApplications.filter(app => (app.platform || 'LinkedIn') === filterPlatform);
   }
 
@@ -312,6 +289,10 @@ const JobApplicationTracker = () => {
     if (!app.followUpDate) return false;
     const followUp = new Date(app.followUpDate);
     const today = new Date();
+    // Reset time components for accurate date comparison
+    today.setHours(0, 0, 0, 0); 
+    followUp.setHours(0, 0, 0, 0);
+
     return followUp <= today && !['Rejected', 'Withdrawn', 'Offer'].includes(app.status);
   });
 
@@ -350,6 +331,7 @@ const JobApplicationTracker = () => {
                   accept=".csv" 
                   onChange={importFromCSV} 
                   className="hidden"
+                  onClick={(e) => e.target.value = null} // Allows importing the same file again
                 />
               </label>
               <button
@@ -450,7 +432,7 @@ const JobApplicationTracker = () => {
               <p className="font-semibold text-orange-800">⚠️ {needsFollowUp.length} application(s) need follow-up!</p>
               <div className="mt-2 text-sm text-orange-700">
                 {needsFollowUp.map(app => (
-                  <div key={app.id}>• {app.company} - {app.position}</div>
+                  <div key={app.id}>• {app.company} - {app.position} (Due: {app.followUpDate})</div>
                 ))}
               </div>
             </div>
@@ -522,7 +504,7 @@ const JobApplicationTracker = () => {
             </div>
           </div>
           <div className="mt-3 text-sm text-gray-600">
-            Showing {filteredApplications.length} of {applications.length} applications
+            Showing **{filteredApplications.length}** of **{applications.length}** applications
           </div>
         </div>
 
@@ -705,15 +687,8 @@ const JobApplicationTracker = () => {
                           {statusOptions.map(status => <option key={status} value={status}>{status}</option>)}
                         </select>
                       ) : (
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
-                          ${app.status === 'Applied' ? 'bg-yellow-100 text-yellow-800' : ''}
-                          ${app.status === 'Screening' ? 'bg-purple-100 text-purple-800' : ''}
-                          ${app.status === 'Interview Scheduled' || app.status === 'Interviewed' ? 'bg-indigo-100 text-indigo-800' : ''}
-                          ${app.status === 'Offer' ? 'bg-green-100 text-green-800' : ''}
-                          ${app.status === 'Rejected' ? 'bg-red-100 text-red-800' : ''}
-                          ${app.status === 'Withdrawn' ? 'bg-gray-100 text-gray-800' : ''}
-                          ${app.status === 'Follow-up Needed' ? 'bg-orange-100 text-orange-800' : ''}
-                        `}>
+                        // Use the statusColorMap for cleaner styling
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColorMap[app.status] || 'bg-gray-100 text-gray-800'}`}>
                           {app.status}
                         </span>
                       )}
@@ -748,7 +723,8 @@ const JobApplicationTracker = () => {
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       {editingId === app.id ? (
                         <div className="flex gap-2">
-                          <button onClick={() => saveEdit(app.id)} className="text-green-600 hover:text-green-900">
+                          {/* saveEdit now only closes the editing state */}
+                          <button onClick={saveEdit} className="text-green-600 hover:text-green-900"> 
                             <Save size={18} />
                           </button>
                           <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-900">
@@ -775,7 +751,7 @@ const JobApplicationTracker = () => {
 
         {filteredApplications.length === 0 && (
           <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">No applications found. Click "New Application" to get started!</p>
+            <p className="text-lg">No applications found. Click "**New Application**" to get started!</p>
           </div>
         )}
 
@@ -785,7 +761,7 @@ const JobApplicationTracker = () => {
           <ul className="text-sm text-gray-700 space-y-1">
             <li>• Target 5-10 applications daily (mix of local and remote)</li>
             <li>• Follow up 1-2 weeks after applying if no response</li>
-            <li>• Use "Support" CV for support roles, "Infrastructure" for engineer roles</li>
+            <li>• Use "**Support**" CV for support roles, "**Infrastructure**" for engineer roles</li>
             <li>• Customize your CV for each application when possible</li>
             <li>• Track which CV version you sent for consistency in interviews</li>
             <li>• Set follow-up reminders to stay proactive</li>
