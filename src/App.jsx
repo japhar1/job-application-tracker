@@ -51,7 +51,7 @@ const JobApplicationTracker = () => {
   const platformOptions = ['LinkedIn', 'Upwork', 'Indeed', 'Company Website', 'Referral', 'Recruiter Contact', 'Other'];
 
 
-  // --- Persistence Logic ---
+  // --- Persistence Logic (Updated for localStorage) ---
 
   // Load data from persistent storage on mount
   useEffect(() => {
@@ -63,7 +63,7 @@ const JobApplicationTracker = () => {
     if (!loading) {
       // Use a debounce timer to avoid saving on every keystroke
       const handler = setTimeout(() => {
-        if (applications.length > 0) {
+        if (applications.length > 0 || lastSync !== null) { // Save even if applications become empty
           saveData();
         }
       }, 500); // 500ms debounce time
@@ -77,15 +77,18 @@ const JobApplicationTracker = () => {
 
   const loadData = async () => {
     try {
-      // window.storage is assumed to be available
-      const result = await window.storage.get('job-applications'); 
-      if (result && result.value) {
-        const data = JSON.parse(result.value);
+      // >>> START localStorage UPDATE <<<
+      const result = localStorage.getItem('job-applications'); 
+      if (result) { 
+        const data = JSON.parse(result);
         setApplications(data.applications || []);
-        setLastSync(new Date(data.lastSync));
+        if (data.lastSync) {
+            setLastSync(new Date(data.lastSync));
+        }
       }
+      // >>> END localStorage UPDATE <<<
     } catch (error) {
-      console.log('No existing data, starting fresh');
+      console.log('No existing data, starting fresh or error loading from storage.');
     } finally {
       setLoading(false);
     }
@@ -98,8 +101,11 @@ const JobApplicationTracker = () => {
         applications,
         lastSync: new Date().toISOString()
       };
-      // window.storage is assumed to be available
-      await window.storage.set('job-applications', JSON.stringify(data)); 
+      
+      // >>> START localStorage UPDATE <<<
+      localStorage.setItem('job-applications', JSON.stringify(data)); 
+      // >>> END localStorage UPDATE <<<
+
       setLastSync(new Date());
     } catch (error) {
       console.error('Save failed:', error);
@@ -187,7 +193,8 @@ const JobApplicationTracker = () => {
         const rows = text.split('\n').slice(1); // Skip header
         const imported = rows.filter(row => row.trim()).map(row => {
           // This crude split relies heavily on the export order and format
-          const [company, position, platform, location, dateApplied, status, salary, jobUrl, contactPerson, cvVersion, followUpDate, notes] = row.split(',').map(s => s?.trim().replace(/"/g, ''));
+          const fields = row.split(',').map(s => s?.trim().replace(/"/g, ''));
+          const [company, position, platform, location, dateApplied, status, salary, jobUrl, contactPerson, cvVersion, followUpDate, notes] = fields;
           return {
             id: Date.now() + Math.random(),
             company: company,
