@@ -1,32 +1,115 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Download, Filter } from 'lucide-react';
+{/* Enhanced Filter & Search */}
+        <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Search</label>
+              <input
+                type="text"
+                placeholder="Company, position, notes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Status Filter</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="All">All Status ({applications.length})</option>
+                {statusOptions.map(status => (
+                  <option key={status} value={status}>
+                    {status} ({applications.filter(a => a.status === status).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Platform Filter</label>
+              <select
+                value={filterPlatform}
+                onChange={(e) => setFilterPlatform(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="All">All Platforms</option>
+                {platformOptions.map(platform => (
+                  <option key={platform} value={platform}>{platform}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Sort By</label>
+              <div className="flex gap-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded px-3 py-2import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Download, Filter, Upload, TrendingUp, Calendar, Briefcase } from 'lucide-react';
 
 const JobApplicationTracker = () => {
-  const [applications, setApplications] = useState([
-    {
-      id: 1,
-      company: 'Example Tech',
-      position: 'Azure Support Engineer',
-      location: 'Remote',
-      dateApplied: '2024-10-20',
-      status: 'Applied',
-      salary: '$60k-80k',
-      jobUrl: 'https://example.com/jobs',
-      contactPerson: 'John Doe',
-      notes: 'Follows up in 2 weeks',
-      cvVersion: 'Support',
-      followUpDate: '2024-11-03',
-      lastUpdate: '2024-10-20'
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
+
+  // Load data from persistent storage on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Auto-save whenever applications change
+  useEffect(() => {
+    if (applications.length > 0 && !loading) {
+      saveData();
     }
-  ]);
+  }, [applications]);
+
+  const loadData = async () => {
+    try {
+      const result = await window.storage.get('job-applications');
+      if (result && result.value) {
+        const data = JSON.parse(result.value);
+        setApplications(data.applications || []);
+        setLastSync(new Date(data.lastSync));
+      }
+    } catch (error) {
+      console.log('No existing data, starting fresh');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveData = async () => {
+    setSyncing(true);
+    try {
+      const data = {
+        applications,
+        lastSync: new Date().toISOString()
+      };
+      await window.storage.set('job-applications', JSON.stringify(data));
+      setLastSync(new Date());
+    } catch (error) {
+      console.error('Save failed:', error);
+      alert('Failed to save data. Please export as backup.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterPlatform, setFilterPlatform] = useState('All');
+  const [sortBy, setSortBy] = useState('dateApplied');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [searchTerm, setSearchTerm] = useState('');
   const [newApp, setNewApp] = useState({
     company: '',
     position: '',
     location: '',
+    platform: 'LinkedIn',
     dateApplied: new Date().toISOString().split('T')[0],
     status: 'Applied',
     salary: '',
@@ -38,9 +121,10 @@ const JobApplicationTracker = () => {
     lastUpdate: new Date().toISOString().split('T')[0]
   });
 
-  const statusOptions = ['Applied', 'Screening', 'Interview Scheduled', 'Interviewed', 'Offer', 'Rejected', 'Withdrawn', 'Follow-up Needed'];
+  const statusOptions = ['Applied', 'Screening', 'Interview Scheduled', 'Interviewed', 'Technical Test', 'Offer', 'Rejected', 'Withdrawn', 'Follow-up Needed'];
   const cvVersionOptions = ['Support', 'Infrastructure', 'Custom'];
-  const locationTypes = ['Remote', 'Hybrid', 'On-site - Lagos', 'On-site - Ibadan', 'Other'];
+  const locationTypes = ['Remote', 'Hybrid', 'On-site - Lagos', 'On-site - Ibadan', 'On-site - Abuja', 'International Remote', 'Other'];
+  const platformOptions = ['LinkedIn', 'Upwork', 'Indeed', 'Company Website', 'Referral', 'Recruiter Contact', 'Other'];
 
   const addApplication = () => {
     if (newApp.company && newApp.position) {
@@ -49,6 +133,7 @@ const JobApplicationTracker = () => {
         company: '',
         position: '',
         location: '',
+        platform: 'LinkedIn',
         dateApplied: new Date().toISOString().split('T')[0],
         status: 'Applied',
         salary: '',
@@ -91,12 +176,13 @@ const JobApplicationTracker = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Company', 'Position', 'Location', 'Date Applied', 'Status', 'Salary', 'Job URL', 'Contact Person', 'CV Version', 'Follow-up Date', 'Notes', 'Last Update'];
+    const headers = ['Company', 'Position', 'Platform', 'Location', 'Date Applied', 'Status', 'Salary', 'Job URL', 'Contact Person', 'CV Version', 'Follow-up Date', 'Notes', 'Last Update'];
     const csvContent = [
       headers.join(','),
       ...applications.map(app => [
         app.company,
         app.position,
+        app.platform || 'LinkedIn',
         app.location,
         app.dateApplied,
         app.status,
@@ -118,17 +204,108 @@ const JobApplicationTracker = () => {
     a.click();
   };
 
-  const filteredApplications = filterStatus === 'All' 
-    ? applications 
-    : applications.filter(app => app.status === filterStatus);
+  const importFromCSV = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        const rows = text.split('\n').slice(1); // Skip header
+        const imported = rows.filter(row => row.trim()).map(row => {
+          const [company, position, platform, location, dateApplied, status, salary, jobUrl, contactPerson, cvVersion, followUpDate, notes] = row.split(',');
+          return {
+            id: Date.now() + Math.random(),
+            company: company?.trim(),
+            position: position?.trim(),
+            platform: platform?.trim() || 'LinkedIn',
+            location: location?.trim(),
+            dateApplied: dateApplied?.trim(),
+            status: status?.trim(),
+            salary: salary?.trim(),
+            jobUrl: jobUrl?.trim(),
+            contactPerson: contactPerson?.trim(),
+            cvVersion: cvVersion?.trim(),
+            followUpDate: followUpDate?.trim(),
+            notes: notes?.replace(/"/g, '').trim(),
+            lastUpdate: new Date().toISOString().split('T')[0]
+          };
+        });
+        setApplications([...applications, ...imported]);
+        alert(`Imported ${imported.length} applications`);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Filtering and sorting
+  let filteredApplications = applications;
+
+  // Apply status filter
+  if (filterStatus !== 'All') {
+    filteredApplications = filteredApplications.filter(app => app.status === filterStatus);
+  }
+
+  // Apply platform filter
+  if (filterPlatform !== 'All') {
+    filteredApplications = filteredApplications.filter(app => (app.platform || 'LinkedIn') === filterPlatform);
+  }
+
+  // Apply search
+  if (searchTerm) {
+    filteredApplications = filteredApplications.filter(app => 
+      app.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }
+
+  // Apply sorting
+  filteredApplications = [...filteredApplications].sort((a, b) => {
+    let aVal = a[sortBy];
+    let bVal = b[sortBy];
+    
+    if (sortBy === 'dateApplied' || sortBy === 'followUpDate') {
+      aVal = new Date(aVal || '1970-01-01');
+      bVal = new Date(bVal || '1970-01-01');
+    }
+    
+    if (sortOrder === 'asc') {
+      return aVal > bVal ? 1 : -1;
+    } else {
+      return aVal < bVal ? 1 : -1;
+    }
+  });
 
   const stats = {
     total: applications.length,
     applied: applications.filter(a => a.status === 'Applied').length,
     screening: applications.filter(a => a.status === 'Screening').length,
     interview: applications.filter(a => a.status === 'Interview Scheduled' || a.status === 'Interviewed').length,
+    technical: applications.filter(a => a.status === 'Technical Test').length,
     offer: applications.filter(a => a.status === 'Offer').length,
-    rejected: applications.filter(a => a.status === 'Rejected').length
+    rejected: applications.filter(a => a.status === 'Rejected').length,
+    thisWeek: applications.filter(a => {
+      const appDate = new Date(a.dateApplied);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return appDate >= weekAgo;
+    }).length,
+    thisMonth: applications.filter(a => {
+      const appDate = new Date(a.dateApplied);
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      return appDate >= monthAgo;
+    }).length,
+    byPlatform: {
+      linkedin: applications.filter(a => (a.platform || 'LinkedIn') === 'LinkedIn').length,
+      upwork: applications.filter(a => (a.platform || 'LinkedIn') === 'Upwork').length,
+      indeed: applications.filter(a => (a.platform || 'LinkedIn') === 'Indeed').length,
+      company: applications.filter(a => (a.platform || 'LinkedIn') === 'Company Website').length,
+      other: applications.filter(a => !['LinkedIn', 'Upwork', 'Indeed', 'Company Website'].includes(a.platform || 'LinkedIn')).length
+    },
+    responseRate: applications.length > 0 
+      ? Math.round(((applications.filter(a => !['Applied', 'Rejected', 'Withdrawn'].includes(a.status)).length / applications.length) * 100))
+      : 0
   };
 
   const needsFollowUp = applications.filter(app => {
@@ -137,6 +314,17 @@ const JobApplicationTracker = () => {
     const today = new Date();
     return followUp <= today && !['Rejected', 'Withdrawn', 'Offer'].includes(app.status);
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your applications...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -147,8 +335,23 @@ const JobApplicationTracker = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-800">Job Application Tracker</h1>
               <p className="text-gray-600 mt-1">Olusegun Balogun - Azure/Cloud Roles</p>
+              {lastSync && (
+                <p className="text-sm text-gray-500 mt-1">
+                  {syncing ? '💾 Saving...' : `✅ Last saved: ${lastSync.toLocaleTimeString()}`}
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
+              <label className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 transition cursor-pointer">
+                <Upload size={20} />
+                Import CSV
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={importFromCSV} 
+                  className="hidden"
+                />
+              </label>
               <button
                 onClick={() => setIsAdding(!isAdding)}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 transition"
@@ -166,8 +369,8 @@ const JobApplicationTracker = () => {
             </div>
           </div>
 
-          {/* Stats Dashboard */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mt-6">
+          {/* Enhanced Stats Dashboard */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-6">
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
               <div className="text-sm text-gray-600">Total</div>
@@ -184,6 +387,10 @@ const JobApplicationTracker = () => {
               <div className="text-2xl font-bold text-indigo-600">{stats.interview}</div>
               <div className="text-sm text-gray-600">Interview</div>
             </div>
+            <div className="bg-cyan-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-cyan-600">{stats.technical}</div>
+              <div className="text-sm text-gray-600">Technical</div>
+            </div>
             <div className="bg-green-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-green-600">{stats.offer}</div>
               <div className="text-sm text-gray-600">Offers</div>
@@ -191,6 +398,49 @@ const JobApplicationTracker = () => {
             <div className="bg-red-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
               <div className="text-sm text-gray-600">Rejected</div>
+            </div>
+            <div className="bg-teal-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-teal-600">{stats.responseRate}%</div>
+              <div className="text-sm text-gray-600">Response</div>
+            </div>
+          </div>
+
+          {/* Time-based Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
+            <div className="bg-gray-50 p-3 rounded-lg flex items-center gap-2">
+              <Calendar size={20} className="text-gray-600" />
+              <div>
+                <div className="font-bold text-gray-800">{stats.thisWeek}</div>
+                <div className="text-xs text-gray-600">This Week</div>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg flex items-center gap-2">
+              <Briefcase size={20} className="text-gray-600" />
+              <div>
+                <div className="font-bold text-gray-800">{stats.thisMonth}</div>
+                <div className="text-xs text-gray-600">This Month</div>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg flex items-center gap-2">
+              <TrendingUp size={20} className="text-blue-600" />
+              <div>
+                <div className="font-bold text-blue-600">{stats.byPlatform.linkedin}</div>
+                <div className="text-xs text-gray-600">LinkedIn</div>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg flex items-center gap-2">
+              <TrendingUp size={20} className="text-green-600" />
+              <div>
+                <div className="font-bold text-green-600">{stats.byPlatform.upwork}</div>
+                <div className="text-xs text-gray-600">Upwork</div>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg flex items-center gap-2">
+              <TrendingUp size={20} className="text-purple-600" />
+              <div>
+                <div className="font-bold text-purple-600">{stats.byPlatform.indeed}</div>
+                <div className="text-xs text-gray-600">Indeed</div>
+              </div>
             </div>
           </div>
 
@@ -207,23 +457,72 @@ const JobApplicationTracker = () => {
           )}
         </div>
 
-        {/* Filter */}
+        {/* Enhanced Filter & Search */}
         <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Filter size={20} className="text-gray-600" />
-            <label className="text-gray-700 font-medium">Filter by Status:</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="All">All Applications ({applications.length})</option>
-              {statusOptions.map(status => (
-                <option key={status} value={status}>
-                  {status} ({applications.filter(a => a.status === status).length})
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Search</label>
+              <input
+                type="text"
+                placeholder="Company, position, notes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Status Filter</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="All">All Status ({applications.length})</option>
+                {statusOptions.map(status => (
+                  <option key={status} value={status}>
+                    {status} ({applications.filter(a => a.status === status).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Platform Filter</label>
+              <select
+                value={filterPlatform}
+                onChange={(e) => setFilterPlatform(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="All">All Platforms</option>
+                {platformOptions.map(platform => (
+                  <option key={platform} value={platform}>{platform}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Sort By</label>
+              <div className="flex gap-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="dateApplied">Date Applied</option>
+                  <option value="company">Company</option>
+                  <option value="status">Status</option>
+                  <option value="followUpDate">Follow-up Date</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-sm text-gray-600">
+            Showing {filteredApplications.length} of {applications.length} applications
           </div>
         </div>
 
